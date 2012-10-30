@@ -51,6 +51,7 @@ class TreeItem(models.Model):
     hidden = models.BooleanField(_('Hidden'), help_text=_('Whether to show this item in navigation.'), db_index=True, default=False)
     alias = CharFieldNullable(_('Alias'), max_length=80, help_text=_('Short name to address site tree item from a template.<br /><b>Reserved aliases:</b> "trunk", "this-children", "this-siblings" and "this-ancestor-children".'), db_index=True, blank=True, null=True)
     description = models.TextField(_('Description'), help_text=_('Additional comments on this item.'), blank=True, default='')
+    css = models.CharField(_('Extra CSS'), max_length=200, help_text=_('Optional css class to associate icons or other styling with the menu item.'), db_index=True, blank=True)
     inmenu = models.BooleanField(_('Show in menu'), help_text=_('Whether to show this item in a menu.'), db_index=True, default=True)
     inbreadcrumbs = models.BooleanField(_('Show in breadcrumb path'), help_text=_('Whether to show this item in a breadcrumb path.'), db_index=True, default=True)
     insitetree = models.BooleanField(_('Show in site tree'), help_text=_('Whether to show this item in a site tree.'), db_index=True, default=True)
