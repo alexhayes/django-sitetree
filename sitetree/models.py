@@ -69,6 +69,8 @@ class TreeItem(models.Model):
     # This is the current approach of tree representation for sitetree.
     parent = models.ForeignKey('self', verbose_name=_('Parent'), help_text=_('Parent site tree item.'), db_index=True, null=True, blank=True)
     sort_order = models.IntegerField(_('Sort order'), help_text=_('Item position among other site tree items under the same parent.'), db_index=True, default=0)
+    isdivider = models.BooleanField(_('Is divider'), help_text=_('Specifies that this item is a divider, not an link.'), default=False, blank=True)
+    isheader = models.BooleanField(_('Is header'), help_text=_('Specifies that this item is a header, not an link.'), default=False, blank=True)
 
     def save(self, force_insert=False, force_update=False, **kwargs):
         """We override parent save method to set item's sort order to its' primary
