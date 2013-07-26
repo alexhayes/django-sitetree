@@ -3,7 +3,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.conf import settings
 from django.contrib.auth.models import Permission
 from django.utils.encoding import python_2_unicode_compatible
-
+from django.db.models.query import QuerySet
 
 # This allows South to handle our custom 'CharFieldNullable' field.
 if 'south' in settings.INSTALLED_APPS:
@@ -39,6 +39,18 @@ class Tree(models.Model):
     def __str__(self):
         return self.alias
 
+class QuerySetManager(models.Manager):
+    """
+    @see http://djangosnippets.org/snippets/734/
+    @see http://hunterford.me/django-custom-model-manager-chaining/
+    """
+    def get_query_set(self):
+        return self.model.QuerySet(self.model)
+    
+    def __getattr__(self, name, *args):
+        if name.startswith('_'):
+            raise AttributeError
+        return getattr(self.get_query_set(), name, *args)
 
 @python_2_unicode_compatible
 class TreeItem(models.Model):
@@ -73,6 +85,8 @@ class TreeItem(models.Model):
     isdivider = models.BooleanField(_('Is divider'), help_text=_('Specifies that this item is a divider, not an link.'), default=False, blank=True)
     isheader = models.BooleanField(_('Is header'), help_text=_('Specifies that this item is a header, not an link.'), default=False, blank=True)
 
+    objects = QuerySetManager()
+
     def save(self, force_insert=False, force_update=False, **kwargs):
         """We override parent save method to set item's sort order to its' primary
         key value.
@@ -90,3 +104,7 @@ class TreeItem(models.Model):
 
     def __str__(self):
         return self.title
+
+    class QuerySet(QuerySet):
+        def inmenu(self):
+            return self.filter(inmenu=True)
