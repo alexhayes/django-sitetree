@@ -87,7 +87,7 @@ class TreeItemAdmin(admin.ModelAdmin):
         }),
         (_('Display settings'), {
             'classes': ('collapse',),
-            'fields': ('hidden', 'inmenu', 'inbreadcrumbs', 'insitetree')
+            'fields': ('hidden', 'inmenu', 'inbreadcrumbs', 'insitetree', 'isheader', 'isdivider')
         }),
         (_('Additional settings'), {
             'classes': ('collapse',),

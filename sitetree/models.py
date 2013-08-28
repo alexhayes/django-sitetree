@@ -61,6 +61,7 @@ class TreeItemBase(models.Model):
     hidden = models.BooleanField(_('Hidden'), help_text=_('Whether to show this item in navigation.'), db_index=True, default=False)
     alias = CharFieldNullable(_('Alias'), max_length=80, help_text=_('Short name to address site tree item from a template.<br /><b>Reserved aliases:</b> "trunk", "this-children", "this-siblings" and "this-ancestor-children".'), db_index=True, blank=True, null=True)
     description = models.TextField(_('Description'), help_text=_('Additional comments on this item.'), blank=True, default='')
+    css = models.CharField(_('Extra CSS'), max_length=200, help_text=_('Optional css class to associate icons or other styling with the menu item.'), db_index=True, blank=True)
     inmenu = models.BooleanField(_('Show in menu'), help_text=_('Whether to show this item in a menu.'), db_index=True, default=True)
     inbreadcrumbs = models.BooleanField(_('Show in breadcrumb path'), help_text=_('Whether to show this item in a breadcrumb path.'), db_index=True, default=True)
     insitetree = models.BooleanField(_('Show in site tree'), help_text=_('Whether to show this item in a site tree.'), db_index=True, default=True)
@@ -72,6 +73,8 @@ class TreeItemBase(models.Model):
     # This is the current approach of tree representation for sitetree.
     parent = models.ForeignKey('self', related_name='%(class)s_parent', verbose_name=_('Parent'), help_text=_('Parent site tree item.'), db_index=True, null=True, blank=True)
     sort_order = models.IntegerField(_('Sort order'), help_text=_('Item position among other site tree items under the same parent.'), db_index=True, default=0)
+    isdivider = models.BooleanField(_('Is divider'), help_text=_('Specifies that this item is a divider, not an link.'), default=False, blank=True)
+    isheader = models.BooleanField(_('Is header'), help_text=_('Specifies that this item is a header, not an link.'), default=False, blank=True)
 
     def save(self, force_insert=False, force_update=False, **kwargs):
         """We override parent save method to set item's sort order to its' primary
