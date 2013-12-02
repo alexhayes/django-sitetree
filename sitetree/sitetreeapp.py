@@ -134,9 +134,15 @@ class SiteTree(object):
         # Listen to the changes in item permissions table.
         signals.m2m_changed.connect(self.cache_empty, sender=MODEL_TREE_ITEM_CLASS.access_permissions)
 
+    def sitetree_cache_key(self):
+        return '%s-sitetrees' % settings.SITE_ID 
+
+    def tree_aliases_cache_key(self):
+        return '%s-tree_aliases' % settings.SITE_ID
+
     def cache_init(self):
         """Initializes local cache from Django cache."""
-        cache_ = cache.get('sitetrees')
+        cache_ = cache.get(self.sitetree_cache_key())
         if cache_ is None:
             # Init cache dictionary with predefined entries.
             cache_ = {'sitetrees': {}, 'urls': {}, 'parents': {}, 'items_by_ids': {}, 'tree_aliases': {}}
@@ -144,13 +150,13 @@ class SiteTree(object):
 
     def cache_save(self):
         """Saves sitetree data to Django cache."""
-        cache.set('sitetrees', self.cache, CACHE_TIMEOUT)
+        cache.set(self.sitetree_cache_key(), self.cache, CACHE_TIMEOUT)
 
     def cache_empty(self, **kwargs):
         """Empties cached sitetree data."""
         self.cache = None
-        cache.delete('sitetrees')
-        cache.delete('tree_aliases')
+        cache.delete(self.sitetree_cache_key())
+        cache.delete(self.tree_aliases_cache_key())
 
     def get_cache_entry(self, entry_name, key):
         """Returns cache entry parameter value by its name."""
@@ -188,10 +194,10 @@ class SiteTree(object):
         if alias in _I18N_TREES:
             current_language_code = get_language().replace('_', '-').split('-')[0]
             i18n_tree_alias = '%s_%s' % (alias, current_language_code)
-            trees_count = self.get_cache_entry('tree_aliases', i18n_tree_alias)
+            trees_count = self.get_cache_entry(self.tree_aliases_cache_key(), i18n_tree_alias)
             if trees_count is False:
-                trees_count = MODEL_TREE_CLASS.objects.filter(alias=i18n_tree_alias).count()
-                self.set_cache_entry('tree_aliases', i18n_tree_alias, trees_count)
+                trees_count = Tree.objects.filter(alias=i18n_tree_alias).count()
+                self.set_cache_entry(self.tree_aliases_cache_key(), i18n_tree_alias, trees_count)
             if trees_count:
                 alias = i18n_tree_alias
         return alias
@@ -207,11 +213,11 @@ class SiteTree(object):
         if self._global_context.current_app != 'admin':
             # We do not need i18n for a tree rendered in Admin dropdown.
             alias = self.resolve_tree_i18n_alias(alias)
-        sitetree = self.get_cache_entry('sitetrees', alias)
+        sitetree = self.get_cache_entry(self.sitetree_cache_key(), alias)
         if not sitetree:
             sitetree = MODEL_TREE_ITEM_CLASS.objects.select_related('parent', 'tree').\
                    filter(tree__alias__exact=alias).order_by('parent__sort_order', 'sort_order')
-            self.set_cache_entry('sitetrees', alias, sitetree)
+            self.set_cache_entry(self.sitetree_cache_key(), alias, sitetree)
             sitetree_needs_caching = True
 
         parents = self.get_cache_entry('parents', alias)
