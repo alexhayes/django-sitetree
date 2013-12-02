@@ -137,9 +137,6 @@ class SiteTree(object):
     def sitetree_cache_key(self):
         return '%s-sitetrees' % settings.SITE_ID 
 
-    def tree_aliases_cache_key(self):
-        return '%s-tree_aliases' % settings.SITE_ID
-
     def cache_init(self):
         """Initializes local cache from Django cache."""
         cache_ = cache.get(self.sitetree_cache_key())
@@ -156,7 +153,7 @@ class SiteTree(object):
         """Empties cached sitetree data."""
         self.cache = None
         cache.delete(self.sitetree_cache_key())
-        cache.delete(self.tree_aliases_cache_key())
+        cache.delete('tree_aliases')
 
     def get_cache_entry(self, entry_name, key):
         """Returns cache entry parameter value by its name."""
@@ -194,10 +191,10 @@ class SiteTree(object):
         if alias in _I18N_TREES:
             current_language_code = get_language().replace('_', '-').split('-')[0]
             i18n_tree_alias = '%s_%s' % (alias, current_language_code)
-            trees_count = self.get_cache_entry(self.tree_aliases_cache_key(), i18n_tree_alias)
+            trees_count = self.get_cache_entry('tree_aliases', i18n_tree_alias)
             if trees_count is False:
                 trees_count = Tree.objects.filter(alias=i18n_tree_alias).count()
-                self.set_cache_entry(self.tree_aliases_cache_key(), i18n_tree_alias, trees_count)
+                self.set_cache_entry('tree_aliases', i18n_tree_alias, trees_count)
             if trees_count:
                 alias = i18n_tree_alias
         return alias
