@@ -153,7 +153,6 @@ class SiteTree(object):
         """Empties cached sitetree data."""
         self.cache = None
         cache.delete(self.sitetree_cache_key())
-        cache.delete('tree_aliases')
 
     def get_cache_entry(self, entry_name, key):
         """Returns cache entry parameter value by its name."""
@@ -210,11 +209,11 @@ class SiteTree(object):
         if self._global_context.current_app != 'admin':
             # We do not need i18n for a tree rendered in Admin dropdown.
             alias = self.resolve_tree_i18n_alias(alias)
-        sitetree = self.get_cache_entry(self.sitetree_cache_key(), alias)
+        sitetree = self.get_cache_entry('sitetrees', alias)
         if not sitetree:
             sitetree = MODEL_TREE_ITEM_CLASS.objects.select_related('parent', 'tree').\
                    filter(tree__alias__exact=alias).order_by('parent__sort_order', 'sort_order')
-            self.set_cache_entry(self.sitetree_cache_key(), alias, sitetree)
+            self.set_cache_entry('sitetrees', alias, sitetree)
             sitetree_needs_caching = True
 
         parents = self.get_cache_entry('parents', alias)
