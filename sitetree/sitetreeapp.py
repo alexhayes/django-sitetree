@@ -229,6 +229,7 @@ class SiteTree(object):
 
     def __init__(self):
         self.cache = None
+        self._get_tree_current_item = {}
         # Listen for signals from the models.
         signals.post_save.connect(self.cache_empty, sender=MODEL_TREE_CLASS)
         signals.post_save.connect(self.cache_empty, sender=MODEL_TREE_ITEM_CLASS)
@@ -432,6 +433,10 @@ class SiteTree(object):
         if self._global_context.current_app == 'admin':
             return None
 
+        if tree_alias in self._get_tree_current_item:
+            # We've discovered the current item previously, just return it.
+            return self._get_tree_current_item[tree_alias]
+
         current_item = None
 
         if 'request' not in self._global_context:
@@ -444,12 +449,12 @@ class SiteTree(object):
                 for url_item in urls_cache:
                     urls_cache[url_item][1].is_current = False
                     if urls_cache[url_item][0] == current_url:
-                        current_item = urls_cache[url_item][1]
+                        self._get_tree_current_item[tree_alias] = urls_cache[url_item][1]
 
         if current_item is not None:
-            current_item.is_current = True
+            self._get_tree_current_item[tree_alias].is_current = True
 
-        return current_item
+        return self._get_tree_current_item[tree_alias]
 
     def url(self, sitetree_item, tag_arguments=None, context=None):
         """Resolves item's URL.
