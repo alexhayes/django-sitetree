@@ -449,10 +449,12 @@ class SiteTree(object):
                 for url_item in urls_cache:
                     urls_cache[url_item][1].is_current = False
                     if urls_cache[url_item][0] == current_url:
-                        self._get_tree_current_item[tree_alias] = urls_cache[url_item][1]
+                        current_item = urls_cache[url_item][1]
 
         if current_item is not None:
-            self._get_tree_current_item[tree_alias].is_current = True
+            current_item.is_current = True
+
+        self._get_tree_current_item[tree_alias] = current_item
 
         return self._get_tree_current_item[tree_alias]
 
