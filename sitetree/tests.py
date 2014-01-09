@@ -4,7 +4,8 @@ from django import template
 from django.core import urlresolvers
 
 from sitetree.models import Tree, TreeItem
-from sitetree.sitetreeapp import SiteTree, SiteTreeError, register_items_hook, register_i18n_trees
+from sitetree.utils import tree, item
+from sitetree.sitetreeapp import SiteTree, SiteTreeError, register_items_hook, register_i18n_trees, register_dynamic_trees, compose_dynamic_tree
 
 from django.conf.urls import patterns, url
 
@@ -107,6 +108,9 @@ class TreeItemModelTest(unittest.TestCase):
         t2_root6 = TreeItem(title='url quoting 1.5 style', tree=t2, url='"url" 2 put_var', urlaspattern=True)
         t2_root6.save(force_insert=True)
 
+        t2_root7 = TreeItem(title='for guests only', tree=t2, url='/some_other/', access_guest=True)
+        t2_root7.save(force_insert=True)
+
         cls.t1 = t1
         cls.t1_root = t1_root
         cls.t1_root_child1 = t1_root_child1
@@ -123,6 +127,7 @@ class TreeItemModelTest(unittest.TestCase):
         cls.t2_root4 = t2_root4
         cls.t2_root5 = t2_root5
         cls.t2_root6 = t2_root6
+        cls.t2_root7 = t2_root7
 
         # set urlconf to test's one
         cls.old_urlconf = urlresolvers.get_urlconf()
@@ -185,7 +190,7 @@ class TreeItemModelTest(unittest.TestCase):
         self.assertEqual(menu[0].in_current_branch, True)
 
         menu = self.sitetree.menu('tree2', 'trunk', get_mock_context(path='/sub/'))
-        self.assertEqual(len(menu), 5)
+        self.assertEqual(len(menu), 6)
         self.assertEqual(menu[0].id, self.t2_root1.id)
         self.assertEqual(menu[1].id, self.t2_root2.id)
         self.assertEqual(menu[0].is_current, False)
@@ -242,13 +247,22 @@ class TreeItemModelTest(unittest.TestCase):
         self.assertEqual(st1[0].has_children, True)
 
         st2 = self.sitetree.tree('tree2', get_mock_context(path='/'))
-        self.assertEqual(len(st2), 5)  # Not every item is visible for non logged in.
+        self.assertIn(self.t2_root7, st2)   # Not every item is visible for non logged in.
+        self.assertNotIn(self.t2_root3, st2)
+        self.assertEqual(len(st2), 6)
+
         self.assertEqual(st2[0].id, self.t2_root1.id)
         self.assertEqual(st2[1].id, self.t2_root2.id)
 
         self.assertEqual(self.t2_root1.access_loggedin, False)
+        self.assertEqual(self.t2_root1.access_guest, False)
         self.assertEqual(self.t2_root2.access_loggedin, False)
+        self.assertEqual(self.t2_root2.access_guest, False)
         self.assertEqual(self.t2_root3.access_loggedin, True)
+        self.assertEqual(self.t2_root3.access_guest, False)
+
+        self.assertEqual(self.t2_root7.access_loggedin, False)
+        self.assertEqual(self.t2_root7.access_guest, True)
 
         self.assertEqual(st2[0].title, '{{ t2_root1_title }}')
         self.assertEqual(st2[1].title, 'put {{ t2_root2_title }} inside')
@@ -262,6 +276,12 @@ class TreeItemModelTest(unittest.TestCase):
         self.assertEqual(st2[1].depth, 0)
         self.assertEqual(st2[0].has_children, False)
         self.assertEqual(st2[1].has_children, False)
+
+        st2 = self.sitetree.tree('tree2', get_mock_context(path='/', user_authorized=True))
+        self.assertNotIn(self.t2_root7, st2)   # Not every item is visible for non logged in.
+        self.assertIn(self.t2_root3, st2)
+        self.assertEqual(len(st2), 6)
+
 
     def test_items_hook_tree(self):
         def my_processor(tree_items, tree_sender):
@@ -377,3 +397,57 @@ class TreeTest(unittest.TestCase):
         self.assertFalse(children[1].is_current)
         self.assertTrue(children[2].is_current)
         self.assertFalse(children[3].is_current)
+
+
+class DynamicTreeTest(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sitetree = SiteTree()
+
+        t1 = Tree(alias='main')
+        t1.save(force_insert=True)
+
+        t1_root = TreeItem(title='root', tree=t1, url='/', alias='for_dynamic')
+        t1_root.save(force_insert=True)
+
+        cls.t1 = t1
+        cls.t1_root = t1_root
+
+    def test_basic(self):
+        register_dynamic_trees((
+            compose_dynamic_tree((
+                tree('dynamic_main_root', items=(
+                    item('dynamic_main_root_1', 'dynamic_main_root_1_url', url_as_pattern=False),
+                    item('dynamic_main_root_2', 'dynamic_main_root_2_url', url_as_pattern=False),
+                )),
+            ), target_tree_alias='main'),
+            compose_dynamic_tree((
+                tree('dynamic_main_sub', items=(
+                    item('dynamic_main_sub_1', 'dynamic_main_sub_1_url', url_as_pattern=False),
+                    item('dynamic_main_sub_2', 'dynamic_main_sub_2_url', url_as_pattern=False),
+                )),
+            ), target_tree_alias='main', parent_tree_item_alias='for_dynamic'),
+            compose_dynamic_tree((
+                tree('dynamic', items=(
+                    item('dynamic_1', 'dynamic_1_url', children=(
+                        item('dynamic_1_sub_1', 'dynamic_1_sub_1_url', url_as_pattern=False),
+                    ), url_as_pattern=False),
+                    item('dynamic_2', 'dynamic_2_url', url_as_pattern=False),
+                )),
+            )),
+        ))
+
+        self.sitetree._global_context = get_mock_context(path='/the_same_url/')
+        tree_alias, sitetree_items = self.sitetree.get_sitetree('main')
+        self.assertEqual(len(sitetree_items), 5)
+        self.assertEqual(sitetree_items[3].title, 'dynamic_main_root_1')
+        self.assertEqual(sitetree_items[4].title, 'dynamic_main_root_2')
+        children = self.sitetree.get_children('main', self.t1_root)
+        self.assertEqual(len(children), 2)
+
+
+        tree_alias, sitetree_items = self.sitetree.get_sitetree('dynamic')
+        self.assertEqual(len(sitetree_items), 3)
+        children = self.sitetree.get_children('dynamic', sitetree_items[0])
+        self.assertEqual(len(children), 1)

@@ -1,3 +1,24 @@
+v0.12.1
+-------
++ Fixed bug when running sitetree with django version 1.4.10
+
+v0.12.0
+-------
++ Implemented runtime defined (dynamic) trees (see #105).
++ Added Foundation breadcrumbs template.
++ Added Semantic UI templates.
+* Fixed `DatabaseError: integer out of range` generated on `sitetree_resync_apps` (see #105).
+* Sitetree for apps module name made adjustable and defaults to `sitetrees` to prevent module name clashes.
+
+
+v0.11.0
+-------
++ Implemented helpers for dynamic tree structuring (see #105)
++ Added experimental support for app-defined trees (see #105).
++ Implemented tree item access restriction "for guests only" (closes #108)
++ Added Bootstrap 3 templates (closes #100).
+
+
 v0.10.0
 -------
 + Added experimental support for user-defined sitetree models (see #64).
@@ -76,7 +97,7 @@ v0.6.0
 ------
 + Added i18n trees support (see #27).
 + Added tree items processing hook support (see #26).
-* Fixed various tree items filtering issues (see #34, #35). 
+* Fixed various tree items filtering issues (see #34, #35).
 
 
 v0.5.2
