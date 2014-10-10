@@ -2,6 +2,9 @@ django-sitetree
 ===============
 http://github.com/idlesign/django-sitetree
 
+.. image:: https://badge.fury.io/py/django-sitetree.png
+    :target: http://badge.fury.io/py/django-sitetree
+
 .. image:: https://pypip.in/d/django-sitetree/badge.png
         :target: https://crate.io/packages/django-sitetree
 
@@ -36,8 +39,3 @@ Documentation
 -------------
 
 http://django-sitetree.readthedocs.org/
-
-
-
-.. image:: https://d2weczhvl823v0.cloudfront.net/idlesign/django-sitegate/trend.png
-        :target: https://bitdeli.com/free
