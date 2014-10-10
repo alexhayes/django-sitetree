@@ -13,6 +13,7 @@ from django.db.models import signals
 from django.utils import six
 from django.utils.http import urlquote
 from django.utils.translation import get_language
+from django.utils.encoding import python_2_unicode_compatible
 from django.template import Context
 from django.template.defaulttags import url as url_tag
 
@@ -38,6 +39,19 @@ _DYNAMIC_TREES = {}
 _IDX_ORPHAN_TREES = 'orphans'
 # Dictinary index name template in `_DYNAMIC_TREES`.
 _IDX_TPL = '%s|:|%s'
+# SiteTree app-wise object.
+_SITETREE = None
+
+
+def get_sitetree():
+    """Returns SiteTree [singleton] object, implementing utility methods.
+
+    :return: SiteTree
+    """
+    global _SITETREE
+    if _SITETREE is None:
+        _SITETREE = SiteTree()
+    return _SITETREE
 
 
 def register_items_hook(callable):
@@ -106,13 +120,13 @@ def register_i18n_trees(aliases):
     _I18N_TREES = aliases
 
 
-def register_dynamic_trees(trees):
+def register_dynamic_trees(trees, *args, **kwargs):
     """Registers dynamic trees to be available for `sitetree` runtime.
     Expects `trees` to be an iterable with structures created with `compose_dynamic_tree()`.
 
     Example::
 
-        register_dynamic_trees((
+        register_dynamic_trees(
 
             # Get all the trees from `my_app`.
             compose_dynamic_tree('my_app'),
@@ -132,14 +146,21 @@ def register_dynamic_trees(trees):
                     item('dynamic_2', 'dynamic_2_url'),
                 )),
             )),
-        ))
+        )
 
+    Accepted kwargs:
+
+    :param bool reset_cache: Resets tree cache, to introduce all changes made to a tree immediately.
     """
 
     global _DYNAMIC_TREES
 
     if _IDX_ORPHAN_TREES not in _DYNAMIC_TREES:
         _DYNAMIC_TREES[_IDX_ORPHAN_TREES] = {}
+
+    if isinstance(trees, dict):  # New `less-brackets` style registration.
+        trees = [trees]
+        trees.extend(args)
 
     for tree in trees:
         if tree is not None and tree['sitetrees'] is not None:
@@ -155,6 +176,10 @@ def register_dynamic_trees(trees):
                 if index not in _DYNAMIC_TREES:
                     _DYNAMIC_TREES[index] = []
                 _DYNAMIC_TREES[index].extend(tree['sitetrees'])
+
+    reset_cache = kwargs.get('reset_cache', False)
+    if reset_cache:
+        get_sitetree().cache_empty()
 
 
 def get_dynamic_trees():
@@ -200,6 +225,7 @@ def compose_dynamic_tree(src, target_tree_alias=None, parent_tree_item_alias=Non
     return None
 
 
+@python_2_unicode_compatible
 class LazyTitle(object):
     """Lazily resolves any variable found in a title of an item.
     Produces resolved title as unicode representation."""
@@ -207,7 +233,7 @@ class LazyTitle(object):
     def __init__(self, title):
         self.title = title
 
-    def __unicode__(self):
+    def __str__(self):
         my_lexer = template.Lexer(self.title, template.UNKNOWN_SOURCE)
         my_tokens = my_lexer.tokenize()
 
@@ -220,7 +246,7 @@ class LazyTitle(object):
         return my_parser.parse().render(SiteTree.get_global_context())
 
     def __eq__(self, other):
-        return self.__unicode__() == other
+        return self.__str__() == other
 
 
 class SiteTree(object):
@@ -276,7 +302,7 @@ class SiteTree(object):
         Almost all variables are resolved against global context.
 
         """
-        if not cls._global_context or hash(context) != hash(cls._global_context):
+        if not cls._global_context or id(context) != id(cls._global_context):
             cls._global_context = context
 
     @classmethod
@@ -347,7 +373,6 @@ class SiteTree(object):
                     items.extend(tree.dynamic_items)
 
         return items
-
 
     def get_sitetree(self, alias):
         """Gets site tree items from the given site tree.
@@ -437,7 +462,8 @@ class SiteTree(object):
         current_item = None
 
         if 'request' not in self._global_context:
-            raise SiteTreeError('Sitetree needs "django.core.context_processors.request" to be in TEMPLATE_CONTEXT_PROCESSORS in your settings file. If it is, check that your view pushes request data into the template.')
+            if settings.DEBUG:
+                raise SiteTreeError('Sitetree needs "django.core.context_processors.request" to be in TEMPLATE_CONTEXT_PROCESSORS in your settings file. If it is, check that your view pushes request data into the template.')
         else:
             # urlquote is an attempt to support non-ascii in url.
             current_url = urlquote(self._global_context['request'].path)
@@ -453,21 +479,13 @@ class SiteTree(object):
 
         return current_item
 
-    def url(self, sitetree_item, tag_arguments=None, context=None):
+    def url(self, sitetree_item, context=None):
         """Resolves item's URL.
 
         'sitetree_item' points to TreeItem object, 'url' property of which
             is processed as URL pattern or simple URL.
 
-        'tag_arguments' is a list of additional arguments passed to
-            'sitetree_url' in template.
-
         """
-        if tag_arguments is None:
-            tag_arguments = []
-        else:
-            # TODO Remove tag_arguments in 1.0.
-            warnings.warn('Use of sitetree_url tag additional arguments is deprecated. Feature support will be completely removed in 1.0.', DeprecationWarning)
 
         if context is None:
             context = self._global_context
@@ -477,20 +495,12 @@ class SiteTree(object):
 
         # Resolve only if item's URL is marked as pattern.
         if sitetree_item.urlaspattern:
-            resolved_var = self.resolve_var(sitetree_item.url, context)
+            url = sitetree_item.url
+            view_path = url
+            all_arguments = []
 
-            # Check whether a template variable is used instead of a URL pattern.
-            if resolved_var != sitetree_item.url:
-                if not isinstance(resolved_var, six.string_types):  # Variable contains what we're not expecting, revert to original URL.
-                    resolved_var = sitetree_item.url
-                # TODO Remove template var resolution in 1.0.
-                warnings.warn('Use of a template variable in URL field is deprecated. Feature support will be completely removed in 1.0.', DeprecationWarning)
-
-            view_path = resolved_var
-            all_arguments = copy(tag_arguments)
-
-            if ' ' in resolved_var:
-                view_path = resolved_var.split(' ')
+            if ' ' in url:
+                view_path = url.split(' ')
                 # We should try to resolve URL parameters from site tree item.
                 for view_argument in view_path[1:]:
                     resolved = self.resolve_var(view_argument)
@@ -605,7 +615,7 @@ class SiteTree(object):
             elif branch_id == ALIAS_THIS_ANCESTOR_CHILDREN and current_item is not None:
                 branch_id = self.get_ancestor_item(tree_alias, current_item).id
                 parent_ids.append(branch_id)
-            elif branch_id == ALIAS_THIS_SIBLINGS and current_item is not None:
+            elif branch_id == ALIAS_THIS_SIBLINGS and current_item is not None and current_item.parent is not None:
                 branch_id = current_item.parent.id
                 parent_ids.append(branch_id)
             elif branch_id == ALIAS_THIS_PARENT_SIBLINGS and current_item is not None:
