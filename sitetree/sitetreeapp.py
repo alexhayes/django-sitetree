@@ -18,7 +18,8 @@ from django.template import Context
 from django.template.defaulttags import url as url_tag
 
 from .utils import get_tree_model, get_tree_item_model, import_app_sitetree_module, generate_id_for
-from .settings import ALIAS_TRUNK, ALIAS_THIS_CHILDREN, ALIAS_THIS_SIBLINGS, ALIAS_THIS_PARENT_SIBLINGS, ALIAS_THIS_ANCESTOR_CHILDREN, UNRESOLVED_ITEM_MARKER
+from .settings import ALIAS_TRUNK, ALIAS_THIS_CHILDREN, ALIAS_THIS_SIBLINGS, ALIAS_THIS_PARENT_SIBLINGS,\
+    ALIAS_THIS_ANCESTOR_CHILDREN, UNRESOLVED_ITEM_MARKER
 
 
 MODEL_TREE_CLASS = get_tree_model()
@@ -374,6 +375,10 @@ class SiteTree(object):
 
         return items
 
+    def current_app_is_admin(self):
+        """Returns boolean whether current application is Admin contrib."""
+        return self._global_context.current_app == 'admin'
+
     def get_sitetree(self, alias):
         """Gets site tree items from the given site tree.
         Caches result to dictionary.
@@ -382,10 +387,11 @@ class SiteTree(object):
         """
         self.cache_init()
         sitetree_needs_caching = False
-        if self._global_context.current_app != 'admin':
+        if not self.current_app_is_admin():
             # We do not need i18n for a tree rendered in Admin dropdown.
             alias = self.resolve_tree_i18n_alias(alias)
         sitetree = self.get_cache_entry('sitetrees', alias)
+
         if not sitetree:
             sitetree = MODEL_TREE_ITEM_CLASS.objects.select_related('parent', 'tree').\
                    filter(tree__alias__exact=alias).order_by('parent__sort_order', 'sort_order')
@@ -456,14 +462,16 @@ class SiteTree(object):
         request path against URL of given tree item.
 
         """
-        if self._global_context.current_app == 'admin':
+        if self.current_app_is_admin():
             return None
 
         current_item = None
 
         if 'request' not in self._global_context:
             if settings.DEBUG:
-                raise SiteTreeError('Sitetree needs "django.core.context_processors.request" to be in TEMPLATE_CONTEXT_PROCESSORS in your settings file. If it is, check that your view pushes request data into the template.')
+                raise SiteTreeError(
+                    'Sitetree needs "django.core.context_processors.request" to be in TEMPLATE_CONTEXT_PROCESSORS '
+                    'in your settings file. If it is, check that your view pushes request data into the template.')
         else:
             # urlquote is an attempt to support non-ascii in url.
             current_url = urlquote(self._global_context['request'].path)
@@ -508,8 +516,9 @@ class SiteTree(object):
                     if isinstance(resolved, six.text_type):
                         if resolved.encode('ascii', 'ignore').decode('ascii') != resolved:
                             resolved = view_argument
-                        # URL parameters from site tree item should be concatenated with those from template.
-                    all_arguments.append('"%s"' % str(resolved))  # We enclose arg in double quotes as already resolved.
+
+                    # We enclose arg in double quotes as already resolved.
+                    all_arguments.append('"%s"' % str(resolved))
                 view_path = view_path[0].strip('"\' ')
 
             if VERSION >= (1, 5, 0):  # "new-style" url tag - consider sitetree named urls literals.
@@ -533,7 +542,10 @@ class SiteTree(object):
             if sitetree_item.urlaspattern:
                 # Form token to pass to Django 'url' tag.
                 url_token = u'url %s as item.url_resolved' % url_pattern
-                url_tag(template.Parser(None), template.Token(token_type=template.TOKEN_BLOCK, contents=url_token)).render(context)
+                url_tag(
+                    template.Parser(None),
+                    template.Token(token_type=template.TOKEN_BLOCK, contents=url_token)
+                ).render(context)
 
                 # We make an anchor link from an unresolved URL as a reminder.
                 if not context['item.url_resolved']:
@@ -575,7 +587,9 @@ class SiteTree(object):
         # Current item is unresolved, fail silently.
         if current_item is None:
             if settings.DEBUG:
-                raise SiteTreeError('Unable to resolve current sitetree item to get a `%s` for current page. Check whether there is an appropriate sitetree item defined for current URL.' % attr_name)
+                raise SiteTreeError(
+                    'Unable to resolve current sitetree item to get a `%s` for current page. Check whether '
+                    'there is an appropriate sitetree item defined for current URL.' % attr_name)
             return ''
         return getattr(current_item, attr_name, '')
 
@@ -706,11 +720,7 @@ class SiteTree(object):
         """
         # Resolve parent item and current tree alias.
         parent_item = self.resolve_var(parent_item, context)
-        tree_alias = parent_item.tree.alias
-        # Resolve tree_alias from the context.
-        tree_alias = self.resolve_var(tree_alias)
-        # Get tree.
-        tree_alias, tree_items = self.get_sitetree(tree_alias)
+        tree_alias, tree_items = self.get_sitetree(parent_item.tree.alias)
         # Mark path to current item.
         self.tree_climber(tree_alias, self.get_tree_current_item(tree_alias))
 
@@ -724,7 +734,7 @@ class SiteTree(object):
         return my_template.render(context)
 
     def get_children(self, tree_alias, item):
-        if self._global_context.current_app != 'admin':
+        if not self.current_app_is_admin():
             # We do not need i18n for a tree rendered in Admin dropdown.
             tree_alias = self.resolve_tree_i18n_alias(tree_alias)
         return self.get_cache_entry('parents', tree_alias)[item]
@@ -745,7 +755,7 @@ class SiteTree(object):
         NB: We do not apply any filters to sitetree in admin app.
         """
         items_out = copy(items)
-        if self._global_context.current_app != 'admin':
+        if not self.current_app_is_admin():
             for item in items:
                 no_access = not self.check_access(item, self._global_context)
                 hidden_for_nav_type = navigation_type is not None and not getattr(item, 'in' + navigation_type, False)
