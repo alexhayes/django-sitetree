@@ -32,7 +32,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('title', models.CharField(help_text='Site tree item title. Can contain template variables E.g.: {{ mytitle }}.', max_length=100, verbose_name='Title')),
                 ('hint', models.CharField(default='', help_text='Some additional information about this item that is used as a hint.', max_length=200, verbose_name='Hint', blank=True)),
-                ('url', models.CharField(help_text='Exact URL or URL pattern (see "Additional settings") for this item.', max_length=200, verbose_name='URL', db_index=True)),
+                ('url', models.CharField(help_text='Exact URL or URL pattern (see "Additional settings") for this item.', max_length=191, verbose_name='URL', db_index=True)),
                 ('urlaspattern', models.BooleanField(default=False, help_text='Whether the given URL should be treated as a pattern.<br /><b>Note:</b> Refer to Django "URL dispatcher" documentation (e.g. "Naming URL patterns" part).', db_index=True, verbose_name='URL as Pattern')),
                 ('hidden', models.BooleanField(default=False, help_text='Whether to show this item in navigation.', db_index=True, verbose_name='Hidden')),
                 ('alias', sitetree.models.CharFieldNullable(max_length=80, blank=True, help_text='Short name to address site tree item from a template.<br /><b>Reserved aliases:</b> "trunk", "this-children", "this-siblings", "this-ancestor-children", "this-parent-siblings".', null=True, verbose_name='Alias', db_index=True)),
